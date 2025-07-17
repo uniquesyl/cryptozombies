@@ -1,17 +1,30 @@
 import React from 'react';
 import { useWeb3 } from '../hooks/useWeb3';
+import LoadingState from './LoadingState';
 
 const WalletConnect = () => {
   const {
     account,
     chainId,
     isConnecting,
+    isInitializing,
     error,
+    retryCount,
     connectWallet,
     disconnectWallet,
     switchNetwork,
-    isCorrectNetwork
+    retryConnection
   } = useWeb3();
+
+  // 检查是否在正确的网络
+  const isCorrectNetwork = () => {
+    // 如果 chainId 还没有加载，返回 true 避免显示错误
+    if (chainId === null) {
+      return true;
+    }
+    // Sepolia 测试网的 chainId 是 11155111
+    return chainId === 11155111n;
+  };
 
   const handleConnect = async () => {
     try {
@@ -33,11 +46,24 @@ const WalletConnect = () => {
     }
   };
 
+  // 显示初始化状态
+  if (isInitializing) {
+    return <LoadingState message="正在初始化钱包连接..." />;
+  }
+
   return (
     <div className="flex items-center space-x-4">
       {error && (
-        <div className="text-red-600 text-sm bg-red-50 px-3 py-1 rounded">
-          {error}
+        <div className="text-red-600 text-sm bg-red-50 px-3 py-1 rounded flex items-center justify-between">
+          <span>{error}</span>
+          {retryCount < 3 && (
+            <button
+              onClick={retryConnection}
+              className="ml-2 text-red-800 hover:text-red-900 underline"
+            >
+              重试
+            </button>
+          )}
         </div>
       )}
 

@@ -10,18 +10,42 @@ export const useContract = (provider, signer) => {
   // 初始化合约实例
   useEffect(() => {
     if (provider && signer) {
-      try {
-        const contractInstance = new ethers.Contract(
-          CONTRACT_ADDRESS,
-          CONTRACT_ABI,
-          signer
-        );
-        setContract(contractInstance);
-        setError(null);
-      } catch (err) {
-        console.error('合约初始化失败:', err);
-        setError('合约初始化失败');
-      }
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      const initContract = async () => {
+        while (attempts < maxAttempts) {
+          try {
+            const contractInstance = new ethers.Contract(
+              CONTRACT_ADDRESS,
+              CONTRACT_ABI,
+              signer
+            );
+            
+            // 测试合约连接
+            await contractInstance.zombies(0);
+            
+            setContract(contractInstance);
+            setError(null);
+            console.log('合约初始化成功');
+            break;
+          } catch (err) {
+            attempts++;
+            console.warn(`合约初始化失败，尝试 ${attempts}/${maxAttempts}:`, err);
+            
+            if (attempts >= maxAttempts) {
+              console.error('合约初始化最终失败:', err);
+              setError('合约连接失败，请刷新页面重试');
+              setContract(null);
+            } else {
+              // 等待一段时间后重试
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
+        }
+      };
+      
+      initContract();
     } else {
       setContract(null);
     }

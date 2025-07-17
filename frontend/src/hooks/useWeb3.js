@@ -7,7 +7,9 @@ export const useWeb3 = () => {
   const [account, setAccount] = useState(null);
   const [chainId, setChainId] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // 检测 MetaMask 是否安装
   const detectProvider = useCallback(async () => {
@@ -16,6 +18,23 @@ export const useWeb3 = () => {
     }
     return null;
   }, []);
+
+  // 重试连接
+  const retryConnection = useCallback(async () => {
+    if (retryCount < 3) {
+      setRetryCount(prev => prev + 1);
+      setError(null);
+      
+      // 等待一段时间后重试
+      setTimeout(async () => {
+        try {
+          await connectWallet();
+        } catch (err) {
+          console.warn('重试连接失败:', err);
+        }
+      }, 1000 * (retryCount + 1)); // 递增延迟
+    }
+  }, [retryCount]);
 
   // 连接钱包
   const connectWallet = useCallback(async () => {
@@ -41,9 +60,25 @@ export const useWeb3 = () => {
       const account = accounts[0];
       setAccount(account);
 
-      // 创建 provider 和 signer
-      const provider = new ethers.BrowserProvider(ethereum);
-      const signer = await provider.getSigner();
+      // 创建 provider 和 signer，添加重试机制
+      let provider, signer;
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (attempts < maxAttempts) {
+        try {
+          provider = new ethers.BrowserProvider(ethereum);
+          signer = await provider.getSigner();
+          break;
+        } catch (err) {
+          attempts++;
+          console.warn(`Provider 创建失败，尝试 ${attempts}/${maxAttempts}:`, err);
+          if (attempts >= maxAttempts) {
+            throw new Error('无法创建钱包连接，请刷新页面重试');
+          }
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
       
       setProvider(provider);
       setSigner(signer);
@@ -59,6 +94,7 @@ export const useWeb3 = () => {
       }
 
       console.log('钱包连接成功:', account);
+      setRetryCount(0); // 重置重试计数
       return account;
 
     } catch (err) {
@@ -77,6 +113,7 @@ export const useWeb3 = () => {
     setAccount(null);
     setChainId(null);
     setError(null);
+    setRetryCount(0);
     console.log('钱包已断开连接');
   }, []);
 
@@ -131,16 +168,21 @@ export const useWeb3 = () => {
     
     // 重新获取 provider 和 signer
     if (window.ethereum) {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      setProvider(provider);
-      setSigner(signer);
+      try {
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        setProvider(provider);
+        setSigner(signer);
+      } catch (err) {
+        console.warn('网络变化时重新连接失败:', err);
+      }
     }
   }, []);
 
   // 初始化
   useEffect(() => {
     const initWeb3 = async () => {
+      setIsInitializing(true);
       try {
         const ethereum = await detectProvider();
         
@@ -154,8 +196,25 @@ export const useWeb3 = () => {
             const account = accounts[0];
             setAccount(account);
 
-            const provider = new ethers.BrowserProvider(ethereum);
-            const signer = await provider.getSigner();
+            // 创建 provider 和 signer，添加重试机制
+            let provider, signer;
+            let attempts = 0;
+            const maxAttempts = 3;
+
+            while (attempts < maxAttempts) {
+              try {
+                provider = new ethers.BrowserProvider(ethereum);
+                signer = await provider.getSigner();
+                break;
+              } catch (err) {
+                attempts++;
+                console.warn(`初始化时 Provider 创建失败，尝试 ${attempts}/${maxAttempts}:`, err);
+                if (attempts >= maxAttempts) {
+                  throw new Error('初始化失败，请刷新页面重试');
+                }
+                await new Promise(resolve => setTimeout(resolve, 500));
+              }
+            }
             
             setProvider(provider);
             setSigner(signer);
@@ -182,6 +241,8 @@ export const useWeb3 = () => {
       } catch (err) {
         console.error('初始化 Web3 失败:', err);
         setError(err.message);
+      } finally {
+        setIsInitializing(false);
       }
     };
 
@@ -190,7 +251,7 @@ export const useWeb3 = () => {
 
   // 网络状态自动刷新
   useEffect(() => {
-    if (provider && chainId === null) {
+    if (provider && chainId === null && !isInitializing) {
       const refreshNetwork = async () => {
         try {
           const network = await provider.getNetwork();
@@ -200,21 +261,11 @@ export const useWeb3 = () => {
         }
       };
 
-      // 延迟1秒后重试获取网络信息
-      const timer = setTimeout(refreshNetwork, 1000);
-      return () => clearTimeout(timer);
+      // 延迟刷新，给网络更多时间初始化
+      const timeoutId = setTimeout(refreshNetwork, 2000);
+      return () => clearTimeout(timeoutId);
     }
-  }, [provider, chainId]);
-
-  // 检查是否在正确的网络
-  const isCorrectNetwork = useCallback(() => {
-    // 如果 chainId 还没有加载，返回 true 避免显示错误
-    if (chainId === null) {
-      return true;
-    }
-    // Sepolia 测试网的 chainId 是 11155111
-    return chainId === 11155111n;
-  }, [chainId]);
+  }, [provider, chainId, isInitializing]);
 
   return {
     provider,
@@ -222,11 +273,12 @@ export const useWeb3 = () => {
     account,
     chainId,
     isConnecting,
+    isInitializing,
     error,
+    retryCount,
     connectWallet,
     disconnectWallet,
     switchNetwork,
-    isCorrectNetwork,
-    detectProvider
+    retryConnection
   };
 }; 
