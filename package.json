@@ -1,0 +1,22 @@
+{
+  "dependencies": {
+    "@truffle/hdwallet-provider": "^2.1.15",
+    "dotenv": "^17.2.0",
+    "truffle-hdwallet-provider": "^1.0.17",
+    "web3": "^1.10.0"
+  },
+  "scripts": {
+    "setup": "node setup_env.js",
+    "check-sepolia": "node check_sepolia_connection.js",
+    "check-balance": "node get_sepolia_eth.js",
+    "compile": "truffle compile",
+    "deploy:sepolia": "node deploy_with_retry.js",
+    "deploy:sepolia:direct": "truffle migrate --network sepolia",
+    "deploy:sepolia:reset": "truffle migrate --network sepolia --reset"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.11"
+  }
+}
