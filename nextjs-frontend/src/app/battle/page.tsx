@@ -40,6 +40,15 @@ const BattlePage: React.FC = () => {
         // 加载我的僵尸
         const userZombies = await getAllZombies(account);
         console.log('加载用户僵尸:', userZombies.length, '个');
+        console.log('当前账户:', account);
+        console.log('用户僵尸详情:', userZombies.map(z => ({
+          id: z.id,
+          name: z.name,
+          owner: z.owner,
+          ownerLower: z.owner.toLowerCase(),
+          accountLower: account.toLowerCase(),
+          isOwner: z.owner.toLowerCase() === account.toLowerCase()
+        })));
         setMyZombies(userZombies);
 
         // 加载所有僵尸（用于选择攻击目标）
@@ -68,7 +77,13 @@ const BattlePage: React.FC = () => {
       return;
     }
 
-    if (selectedZombie.owner !== account) {
+    // 验证攻击者确实是用户拥有的僵尸（双重检查）
+    if (selectedZombie.owner.toLowerCase() !== account.toLowerCase()) {
+      console.error('权限检查失败:', {
+        selectedZombieOwner: selectedZombie.owner,
+        account: account,
+        selectedZombieId: selectedZombie.id
+      });
       setError('只能使用自己的僵尸进行攻击');
       return;
     }

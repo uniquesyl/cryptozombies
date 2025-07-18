@@ -1,7 +1,7 @@
 import ZombieDetailClient from './ZombieDetailClient';
 
 // 为静态导出生成参数
-export async function generateStaticParams() {
+export function generateStaticParams() {
   // 由于僵尸ID是动态的，我们生成一些常见的ID范围
   const params = [];
   for (let i = 0; i < 100; i++) {
