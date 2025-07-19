@@ -26,3 +26,8 @@ coverage/
 # Truffle
 .truffle/
 .env
+
+# Markdown files (except README.md and 技术架构图.md)
+*.md
+!README.md
+!技术架构图.md
